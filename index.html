@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Edit_3D - Video Editor with Photo to 3D</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Edit_3D</h1>
+            <div class="header-actions">
+                <button id="export-btn" class="btn btn-primary">Export</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel - Tools -->
+            <aside class="tools-panel">
+                <h3>Tools</h3>
+                <div class="tool-group">
+                    <h4>Import</h4>
+                    <button id="import-video-btn" class="btn">
+                        <span>📹</span> Video
+                    </button>
+                    <button id="import-audio-btn" class="btn">
+                        <span>🎵</span> Audio
+                    </button>
+                    <button id="import-image-btn" class="btn">
+                        <span>🖼️</span> Image
+                    </button>
+                    <button id="import-3d-btn" class="btn btn-highlight">
+                        <span>📸</span> Photo to 3D
+                    </button>
+                </div>
+
+                <div class="tool-group">
+                    <h4>Edit</h4>
+                    <button id="cut-btn" class="btn">✂️ Cut</button>
+                    <button id="copy-btn" class="btn">📋 Copy</button>
+                    <button id="paste-btn" class="btn">📎 Paste</button>
+                </div>
+
+                <div class="tool-group">
+                    <h4>Effects</h4>
+                    <button id="transition-btn" class="btn">🎬 Transitions</button>
+                    <button id="add-layer-btn" class="btn">➕ Add Layer</button>
+                </div>
+            </aside>
+
+            <!-- Center - Preview and Timeline -->
+            <div class="editor-area">
+                <!-- Preview Area -->
+                <div class="preview-container">
+                    <canvas id="preview-canvas"></canvas>
+                    <div id="preview-controls" class="preview-controls">
+                        <button id="play-btn" class="control-btn">▶️</button>
+                        <button id="pause-btn" class="control-btn">⏸️</button>
+                        <button id="stop-btn" class="control-btn">⏹️</button>
+                        <span id="time-display" class="time-display">00:00 / 00:00</span>
+                    </div>
+                </div>
+
+                <!-- Timeline Area -->
+                <div class="timeline-container">
+                    <div class="timeline-header">
+                        <h3>Timeline</h3>
+                        <div class="zoom-controls">
+                            <button id="zoom-in-btn" class="btn-small">+</button>
+                            <button id="zoom-out-btn" class="btn-small">-</button>
+                        </div>
+                    </div>
+                    <div class="timeline-tracks" id="timeline-tracks">
+                        <!-- Tracks will be dynamically added here -->
+                    </div>
+                    <div class="playhead" id="playhead"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Properties -->
+            <aside class="properties-panel">
+                <h3>Properties</h3>
+                <div id="properties-content">
+                    <p class="hint-text">Select an item to view properties</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="video-input" accept="video/*" style="display: none;" multiple>
+    <input type="file" id="audio-input" accept="audio/*" style="display: none;" multiple>
+    <input type="file" id="image-input" accept="image/*" style="display: none;" multiple>
+    <input type="file" id="photo-3d-input" accept="image/*" style="display: none;" capture="environment">
+
+    <!-- Modal for transitions -->
+    <div id="transition-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Transition</h2>
+            <div class="transition-options">
+                <button class="transition-btn" data-type="fade">Fade</button>
+                <button class="transition-btn" data-type="slide">Slide</button>
+                <button class="transition-btn" data-type="zoom">Zoom</button>
+                <button class="transition-btn" data-type="3d-flip">3D Flip</button>
+                <button class="transition-btn" data-type="3d-rotate">3D Rotate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loading-text">Processing...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="gaussian-splatting.js"></script>
+    <script src="editor.js"></script>
+</body>
+</html>
