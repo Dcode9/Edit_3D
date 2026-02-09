@@ -1,6 +1,18 @@
 /**
  * Gaussian Splatting Implementation for Photo to 3D Conversion
- * This module processes iPhone photos to create 3D depth maps using Gaussian Splatting techniques
+ * 
+ * This module processes single photos to create 3D depth maps using Gaussian Splatting techniques.
+ * 
+ * Algorithm Overview:
+ * 1. Depth Map Generation: Analyzes image using luminance and edge detection to estimate depth
+ * 2. Gaussian Splatting: Applies Gaussian convolution to smooth depth transitions
+ * 3. Point Cloud Creation: Generates 3D points from depth data
+ * 4. Real-time Rendering: Renders 3D transformations with perspective projection
+ * 
+ * Usage:
+ * const gs = new GaussianSplatting();
+ * const data3D = await gs.processImage(imageElement, { splattingIntensity: 0.6 });
+ * gs.render3DEffect(canvasElement, data3D, { rotationY: Math.PI / 4 });
  */
 
 class GaussianSplatting {
@@ -34,7 +46,7 @@ class GaussianSplatting {
         const depthMap = this.generateDepthMap(imageData, depthLayers);
 
         // Apply Gaussian splatting
-        const splattedDepth = this.applyGaussianSplatting(depthMap, splattingIntensity, smoothingFactor);
+        const splattedDepth = this.applyGaussianSplatting(depthMap, splattingIntensity, smoothingFactor, image.width, image.height);
 
         // Create 3D point cloud
         const pointCloud = this.createPointCloud(imageData, splattedDepth);
@@ -69,7 +81,7 @@ class GaussianSplatting {
                 const g = imageData.data[idx + 1];
                 const b = imageData.data[idx + 2];
 
-                // Calculate luminance
+                // Calculate luminance (ITU-R BT.601 standard)
                 const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
 
                 // Edge detection (Sobel-like)
@@ -100,10 +112,7 @@ class GaussianSplatting {
      * Apply Gaussian splatting to smooth depth map
      * @private
      */
-    applyGaussianSplatting(depthMap, intensity, smoothingFactor) {
-        const size = Math.sqrt(depthMap.length);
-        const width = size;
-        const height = size;
+    applyGaussianSplatting(depthMap, intensity, smoothingFactor, width, height) {
         const splattedMap = new Float32Array(depthMap.length);
 
         // Gaussian kernel
@@ -272,9 +281,9 @@ class GaussianSplatting {
                 const x_rotY = x3d * cosY + z_rotX * sinY;
                 const z_rotY = -x3d * sinY + z_rotX * cosY;
 
-                // Project to 2D
-                const perspective = 500;
-                const scale2d = perspective / (perspective + z_rotY);
+                // Project to 2D (perspective strength controls 3D depth effect)
+                const perspectiveStrength = animationParams.perspectiveStrength || 500;
+                const scale2d = perspectiveStrength / (perspectiveStrength + z_rotY);
                 const x2d = Math.round(x_rotY * scale2d + data3D.width / 2);
                 const y2d = Math.round(y_rotX * scale2d + data3D.height / 2);
 

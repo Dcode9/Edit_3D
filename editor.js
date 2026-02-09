@@ -1,6 +1,13 @@
 /**
  * Edit_3D Video Editor
  * Main application logic for video editing with photo-to-3D support
+ * 
+ * Architecture:
+ * - Track-based timeline system with multiple layers
+ * - Canvas-based preview rendering
+ * - Integration with GaussianSplatting for 3D effects
+ * - MediaRecorder API for export
+ * - All processing happens client-side
  */
 
 class VideoEditor {
@@ -14,6 +21,8 @@ class VideoEditor {
         this.zoomLevel = 1;
         this.gaussianSplatting = new GaussianSplatting();
         this.items3D = new Map(); // Store 3D data for items
+        this.objectURLs = new Set(); // Track created URLs for cleanup
+        this.lastFrameTime = 0; // For accurate time tracking
 
         this.initializeEditor();
         this.setupEventListeners();
@@ -143,11 +152,13 @@ class VideoEditor {
 
         for (const file of files) {
             const video = document.createElement('video');
-            video.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            this.objectURLs.add(url);
+            video.src = url;
             
             video.addEventListener('loadedmetadata', () => {
                 const item = {
-                    id: `item-${Date.now()}-${Math.random()}`,
+                    id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
                     type: 'video',
                     name: file.name,
                     element: video,
@@ -173,11 +184,13 @@ class VideoEditor {
 
         for (const file of files) {
             const audio = new Audio();
-            audio.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            this.objectURLs.add(url);
+            audio.src = url;
             
             audio.addEventListener('loadedmetadata', () => {
                 const item = {
-                    id: `item-${Date.now()}-${Math.random()}`,
+                    id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
                     type: 'audio',
                     name: file.name,
                     element: audio,
@@ -203,11 +216,13 @@ class VideoEditor {
 
         for (const file of files) {
             const img = new Image();
-            img.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            this.objectURLs.add(url);
+            img.src = url;
             
             img.onload = () => {
                 const item = {
-                    id: `item-${Date.now()}-${Math.random()}`,
+                    id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
                     type: 'image',
                     name: file.name,
                     element: img,
@@ -231,7 +246,9 @@ class VideoEditor {
 
         for (const file of files) {
             const img = new Image();
-            img.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            this.objectURLs.add(url);
+            img.src = url;
             
             img.onload = async () => {
                 try {
@@ -242,7 +259,7 @@ class VideoEditor {
                         smoothingFactor: 2.5
                     });
 
-                    const itemId = `item-${Date.now()}-${Math.random()}`;
+                    const itemId = crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`;
                     const item = {
                         id: itemId,
                         type: '3d',
@@ -406,7 +423,7 @@ class VideoEditor {
         if (this.clipboard) {
             const newItem = {
                 ...this.clipboard,
-                id: `item-${Date.now()}-${Math.random()}`
+                id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`
             };
 
             // If it's a 3D item, copy the 3D data
@@ -426,6 +443,22 @@ class VideoEditor {
         }
     }
 
+    /**
+     * Clean up resources when editor is destroyed
+     */
+    cleanup() {
+        // Revoke all object URLs to prevent memory leaks
+        for (const url of this.objectURLs) {
+            URL.revokeObjectURL(url);
+        }
+        this.objectURLs.clear();
+
+        // Stop animation loop
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+        }
+    }
+
     showTransitionModal() {
         document.getElementById('transition-modal').style.display = 'block';
     }
@@ -433,7 +466,7 @@ class VideoEditor {
     addTransition(type) {
         if (this.selectedItem) {
             const item = {
-                id: `item-${Date.now()}-${Math.random()}`,
+                id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
                 type: 'transition',
                 name: type,
                 transitionType: type,
@@ -474,17 +507,25 @@ class VideoEditor {
     }
 
     startAnimationLoop() {
-        const animate = () => {
+        const animate = (timestamp) => {
             if (this.isPlaying) {
-                this.currentTime += 1/60; // Approximate 60 FPS
+                if (this.lastFrameTime === 0) {
+                    this.lastFrameTime = timestamp;
+                }
+                const deltaTime = (timestamp - this.lastFrameTime) / 1000; // Convert to seconds
+                this.currentTime += deltaTime;
+                this.lastFrameTime = timestamp;
+                
                 this.updatePlayhead();
                 this.renderPreview();
+            } else {
+                this.lastFrameTime = 0; // Reset when not playing
             }
 
             this.animationFrame = requestAnimationFrame(animate);
         };
 
-        animate();
+        this.animationFrame = requestAnimationFrame(animate);
     }
 
     updatePlayhead() {
@@ -498,10 +539,12 @@ class VideoEditor {
             `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} / ` +
             `${String(totalMinutes).padStart(2, '0')}:${String(totalSeconds).padStart(2, '0')}`;
 
-        // Update playhead position
-        const timelineWidth = this.timelineTracksContainer.offsetWidth;
-        const position = (this.currentTime / this.duration) * timelineWidth;
-        this.playhead.style.left = `${position}px`;
+        // Update playhead position (guard against division by zero)
+        if (this.duration > 0) {
+            const timelineWidth = this.timelineTracksContainer.offsetWidth;
+            const position = (this.currentTime / this.duration) * timelineWidth;
+            this.playhead.style.left = `${position}px`;
+        }
     }
 
     renderPreview() {
@@ -538,11 +581,18 @@ class VideoEditor {
         this.showLoading('Exporting project...');
 
         try {
+            // Check codec support and select best available
+            let mimeType = 'video/webm;codecs=vp9';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm;codecs=vp8';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'video/webm';
+                }
+            }
+
             // Create a MediaRecorder to capture the canvas
             const stream = this.canvas.captureStream(30); // 30 FPS
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp9'
-            });
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
 
             const chunks = [];
             mediaRecorder.ondataavailable = (e) => {
